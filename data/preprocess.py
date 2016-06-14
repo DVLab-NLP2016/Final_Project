@@ -51,13 +51,16 @@ def basic_tokenizer(sentence):
     words = tokenizer.tokenize(sentence)
     return [w for w in words if w not in stopwords.words("english")]
 
-def create_vobabulary(vocabulary_path, context, max_vocabulary_size,
+def create_vobabulary(vocabulary_path, context, max_vocabulary_size = 30000,
                               tokenizer=None, normalize_digits=True):
     if not gfile.Exists(vocabulary_path):
         t0 = time.time()
         print ("[*] Creating vocabulary %s" % (vocabulary_path))
         texts = [word for word in context.lower().split() if word not in cachedStopWords]
         dictionary = corpora.Dictionary([texts], prune_at=max_vocabulary_size)
+        print ("[*] Filtering extremes")
+        dictionary.filter_extremes(no_above = 0.8)
+
         print("[*] Tokenize : %.4fs" % (t0 - time.time()))
         dictionary.save(vocabulary_path)
 
@@ -67,6 +70,13 @@ def initialize_vocabulary(vocabulary_path):
         return vocab.token2id, vocab.token2id.keys()
     else:
         raise ValueError("Vocabulary file %s not found.", vocabulary_path)
+
+def max_vocab_size(token):
+    threshold = 30000
+    if token <= threshold:
+        return token
+    else:
+        return UNK_ID
 
 def sentence_to_token_ids(sentence, vocabulary,
                               tokenizer=None, normalize_digits=True):
@@ -78,17 +88,18 @@ def sentence_to_token_ids(sentence, vocabulary,
     if not normalize_digits:
         return [vocabulary.get(w, UNK_ID) for w in words]
     else:
-        return [vocabulary.get(re.sub(_DIGIT_RE, " ", w), UNK_ID) for w in words]
+        return [max_vocab_size(vocabulary.get(re.sub(_DIGIT_RE, " ", w.lower()), UNK_ID)) for w in words]
 
-def data_to_token_ids(vocab, tokenizer = None, normalize_digits = True):
+def data_to_token_ids(vocab, vocab_size, tokenizer = None, normalize_digits = True):
     print("[*] Data 2 Token ids")
     print("[*] Tokenizing train.context")
+    vocab_size = str(vocab_size)
     with gfile.GFile('train.context', mode="r") as trainFile:
         trainResults = []
         for line in trainFile:
             trainIds = sentence_to_token_ids(line, vocab, tokenizer, normalize_digits)
             trainResults.append(" ".join([str(tok) for tok in trainIds]) + '\n')
-    with gfile.GFile('train_token.context', mode="w") as tokenFile:
+    with gfile.GFile('train_token.context'+vocab_size, mode="w") as tokenFile:
         tokenFile.writelines(trainResults)
         del trainResults[:]
 
@@ -103,7 +114,7 @@ def data_to_token_ids(vocab, tokenizer = None, normalize_digits = True):
             else:
                 trainResults.append(line) # Ans.
             counter += 1
-    with gfile.GFile('train_token.opinion', mode="w") as tokenFile:
+    with gfile.GFile('train_token.opinion'+vocab_size, mode="w") as tokenFile:
         tokenFile.writelines(trainResults)
         del trainResults[:]
 
@@ -113,7 +124,7 @@ def data_to_token_ids(vocab, tokenizer = None, normalize_digits = True):
         for line in testFile:
             testIds = sentence_to_token_ids(line, vocab, tokenizer, normalize_digits)
             testResults.append(" ".join([str(tok) for tok in testIds]) + '\n' )
-    with gfile.GFile('test_token.context', mode="w") as tokenFile:
+    with gfile.GFile('test_token.context'+vocab_size, mode="w") as tokenFile:
         tokenFile.writelines(testResults)
         del testResults[:]
 
@@ -126,7 +137,7 @@ def data_to_token_ids(vocab, tokenizer = None, normalize_digits = True):
                 testIds = sentence_to_token_ids(line, vocab, tokenizer, normalize_digits)
                 testResults.append(" ".join([str(tok) for tok in testIds]) + '\n')
             counter += 1
-    with gfile.GFile('test_token.opinion', mode="w") as tokenFile:
+    with gfile.GFile('test_token.opinion'+vocab_size, mode="w") as tokenFile:
         tokenFile.writelines(testResults)
         del testResults[:]
 
@@ -134,7 +145,7 @@ def data_to_token_ids(vocab, tokenizer = None, normalize_digits = True):
 
 def questions_to_token_ids(vocab_fname, vocab_size):
     vocab, _ = initialize_vocabulary(vocab_fname)
-    data_to_token_ids(vocab)
+    data_to_token_ids(vocab, vocab_size)
 
 def prepare_data(dataset_name, vocab_size):
     vocab_fname = os.path.join('%s.vocab%s' % (dataset_name, vocab_size))

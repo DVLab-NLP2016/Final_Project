@@ -17,7 +17,7 @@ trainX = []
 trainY = []
 minorX = []
 minorY = []
-minorDataLen = 50000
+minorDataLen = 1000
 print ("[*] Preprocessing data")
 with open(path, 'r') as f:
     counter = 0
@@ -25,8 +25,8 @@ with open(path, 'r') as f:
     for line in lines:
         if counter % 10000 == 0 and not counter == 0:
             print("[*] %s" % counter)
-        #if counter >= minorDataLen:
-         #   break
+        if counter >= minorDataLen * 2:
+            break
         trainY.append(int(line[0]))
         sp = [int(tok) for tok in line[2:].split()]
         trainX.append(sp)
@@ -112,7 +112,16 @@ with open(testPath, 'r') as f:
 testX = pad_sequences(testX, maxlen=200, value=0.)
 print ("[*] Making prediction")
 
-testPrediction = (model.predict(testX))
+numOfOpinion = 5
+counter = 0
+while True:
+    if (counter + 1) * numOfOpinion >= len(testX):
+        break
+    littlePredict = model.predict(testX[counter*numOfOpinion:(counter+1)*numOfOpinion])
+    for little in littlePredict:
+        testPrediction.append(little)
+    counter += 1
+
 with open('preditcion.txt'+str(minorDataLen), 'w') as f:
     for result in testPrediction:
         f.write(str(result[0])+'\n')

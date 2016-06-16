@@ -12,15 +12,19 @@ import numpy as np
 import sys
 import cPickle
 
-path = sys.argv[1]
+#path = sys.argv[1]
+path = './tmp.txt'
 trainX = []
 trainY = []
+minorX = []
+minorY = []
+minorDataLen = 50000
 print ("[*] Preprocessing data")
 with open(path, 'r') as f:
     counter = 0
     lines = f.readlines()
     for line in lines:
-        if counter % 10000 == 0:
+        if counter % 10000 == 0 and not counter == 0:
             print("[*] %s" % counter)
         trainY.append(int(line[0]))
         sp = [int(tok) for tok in line[2:].split()]
@@ -32,8 +36,21 @@ if not len(trainX) == len(trainY):
     sys.exit(-1)
 indexShuffle = range(len(trainX))
 shuffle(indexShuffle)
-trainX = [trainX[i] for i in indexShuffle]
-trainY = [trainY[i] for i in indexShuffle]
+for index in indexShuffle:
+    if len(minorX) >= minorDataLen:
+        break
+    if len(minorY) == 0:
+        minorX.append(trainX[index])
+        minorY.append(trainY[index])
+    elif (sum(minorY) / float(len(minorY)) <= .5 and trainY[index] == 1) or (sum(minorY) / float(len(minorY)) >= .5 and trainY[index] == 0):
+        minorX.append(trainX[index])
+        minorY.append(trainY[index])
+
+print (len(minorX))
+print (len(minorY))
+print (sum(minorY) / float(len(minorY)))
+trainX = minorX
+trainY = minorY
 # Data preprocessing
 # Sequence padding
 trainX = pad_sequences(trainX, maxlen=200, value=0.)
@@ -75,5 +92,5 @@ model.fit(trainX, trainY, validation_set=0.3, show_metric=True, batch_size=64)
 '''
 print ("[*] Saving model")
 
-with open('model_bilstm.pkl', 'wb') as f:
+with open('model_minorlstm.pkl', 'wb') as f:
     cPickle.dump(model, f)
